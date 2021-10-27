@@ -12,8 +12,10 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+import time
 
 from neutron_lib import exceptions as n_exc
+from oslo_config import cfg
 from oslo_log import log as logging
 from oslo_utils import excutils
 
@@ -104,6 +106,23 @@ class EdgeLoadBalancerManagerFromDict(base_mgr.NsxpLoadbalancerBaseManager):
                 else:
                     tier1_srv = self.core_plugin.nsxpolicy.tier1
                     connectivity_path = tier1_srv.get_path(router_id)
+                    # In API replay mode, reallocate router pool.
+                    # This migth cause some traffic disruption, so only
+                    # execute this during API replay, when the router
+                    # is not serving any traffic
+                    if cfg.CONF.api_replay_mode:
+                        pool_name = lb_const.POOL_ALLOCATION_MAP[lb_size]
+                        LOG.debug("Moving router %s into %s pool",
+                                  router_id, pool_name)
+                        tier1_srv.update(
+                            router_id,
+                            pool_allocation=pool_name)
+                        # The sleep below is to provide a little buffer before
+                        # starting realization checks
+                        time.sleep(2)
+                        LOG.debug("Waiting for realization of %s", router_id)
+                        tier1_srv.wait_until_realized(router_id)
+                        LOG.debug("Router %s realized", router_id)
                 if connectivity_path:
                     with p_utils.get_lb_rtr_lock(router_id):
                         service_client.create_or_overwrite(
