@@ -1714,6 +1714,11 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
             LOG.error('Unable to create DHCP bindings for existing ports '
                       'on subnet %s', subnet['id'])
 
+    @nsxlib_utils.retry_upon_exception(
+        Exception, max_attempts=cfg.CONF.nsx_v3.retries)
+    def _safe_delete_dhcp_server(self, nsx_service_id):
+        self.nsxlib.dhcp_server.delete(nsx_service_id)
+
     def _disable_native_dhcp(self, context, network_id):
         # Disable native DHCP service on the backend for this network.
         # First delete the DHCP port in this network. Then delete the
@@ -1743,7 +1748,7 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                       network_id)
 
         try:
-            self.nsxlib.dhcp_server.delete(dhcp_service['nsx_service_id'])
+            self._safe_delete_dhcp_server(dhcp_service['nsx_service_id'])
             LOG.debug("Deleted logical DHCP server %(server)s for network "
                       "%(network)s",
                       {'server': dhcp_service['nsx_service_id'],
