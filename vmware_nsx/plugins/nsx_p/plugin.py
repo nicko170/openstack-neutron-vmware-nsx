@@ -2294,21 +2294,34 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         return port_data
 
     def _delete_port_on_backend(self, context, net_id, port_id):
+        # Ignore resources not found on the backend, but still
+        # try and delete all of them!
         try:
             segment_id = self._get_network_nsx_segment_id(context, net_id)
-            self.nsxpolicy.segment_port_security_profiles.delete(
-                segment_id, port_id)
-            self.nsxpolicy.segment_port_discovery_profiles.delete(
-                segment_id, port_id)
-            if directory.get_plugin(plugin_const.QOS):
-                self.nsxpolicy.segment_port_qos_profiles.delete(
+            try:
+                self.nsxpolicy.segment_port_security_profiles.delete(
                     segment_id, port_id)
-            self.nsxpolicy.segment_port.delete(segment_id, port_id)
-        except nsx_lib_exc.ResourceNotFound:
-            # If the resource was not found on the backend do not worry about
-            # it. The conditions has already been logged, so there is no need
-            # to do further logging
-            pass
+            except nsx_lib_exc.ResourceNotFound:
+                LOG.debug("Skipping deletion of port security profile for "
+                        "port %s: Not Found", port_id)
+            try:
+                self.nsxpolicy.segment_port_discovery_profiles.delete(
+                    segment_id, port_id)
+            except nsx_lib_exc.ResourceNotFound:
+                LOG.debug("Skipping deletion of port discovery profile for "
+                        "port %s: Not Found", port_id)
+            try:
+                if directory.get_plugin(plugin_const.QOS):
+                    self.nsxpolicy.segment_port_qos_profiles.delete(
+                        segment_id, port_id)
+            except nsx_lib_exc.ResourceNotFound:
+                LOG.debug("Skipping deletion of port QoS profile for "
+                        "port %s: Not Found", port_id)
+            try:
+                self.nsxpolicy.segment_port.delete(segment_id, port_id)
+            except nsx_lib_exc.ResourceNotFound:
+                LOG.debug("Skipping deletion of sement port for "
+                        "port %s: Not Found", port_id)
         except nsx_lib_exc.ManagerError as e:
             # If there is a failure in deleting the resource.
             # In this case the neutron port was not deleted yet.
