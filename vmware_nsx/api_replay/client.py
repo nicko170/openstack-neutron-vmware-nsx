@@ -852,6 +852,11 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                                            {'port': port, 'e': e})
                         continue
 
+                    # Skip ports specific to NSX-V LB implementation
+                    if port['device_owner'] == 'neutron:LB':
+                        LOG.debug("Skipping port %s as it has neutron:LB "
+                                  "device owner", port['id'])
+                        continue
                     # Let the neutron dhcp-agent recreate this on its own
                     if port['device_owner'] == 'network:dhcp':
                         continue
