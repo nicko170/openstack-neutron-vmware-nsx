@@ -85,6 +85,9 @@ class Operations(enum.Enum):
     SET_STATUS_ERROR = 'set-status-error'
     CHECK_COMPUTE_CLUSTERS = 'check-compute-clusters'
     CUTOVER_MAPPINGS = 'mappings-for-edge-cutover'
+    LIST_RTR_NO_IFACE = 'list-routers-no-interfaces'
+    PATCH_RTR_NOGW = 'cutover-fixup-router-nogw'
+    RESTORE_RTR_NOGW = 'cutover-restore-router-nogw'
 
 
 ops = [op.value for op in Operations]
@@ -270,7 +273,8 @@ nsxv_resources = {
                                        Operations.DELETE.value]),
     constants.NSX_MIGRATE_V_T: Resource(constants.NSX_MIGRATE_V_T,
                                         [Operations.VALIDATE.value,
-                                         Operations.CUTOVER_MAPPINGS.value]),
+                                         Operations.CUTOVER_MAPPINGS.value,
+                                         Operations.LIST_RTR_NO_IFACE.value]),
     constants.PORTS: Resource(constants.PORTS,
                               [Operations.LIST.value]),
     constants.LOADBALANCERS: Resource(constants.LOADBALANCERS,
@@ -317,7 +321,9 @@ nsxp_resources = {
     constants.NSX_MIGRATE_V_T: Resource(constants.NSX_MIGRATE_V_T,
                                         [Operations.CLEAN_ALL.value,
                                          Operations.VALIDATE.value,
-                                         Operations.NSX_REDISTRIBUTE.value]),
+                                         Operations.NSX_REDISTRIBUTE.value,
+                                         Operations.PATCH_RTR_NOGW.value,
+                                         Operations.RESTORE_RTR_NOGW.value]),
     constants.LOADBALANCERS: Resource(constants.LOADBALANCERS,
                                       [Operations.SET_STATUS_ERROR.value]),
 }
