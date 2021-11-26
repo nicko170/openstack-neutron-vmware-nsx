@@ -96,6 +96,13 @@ class ExtendedSecurityGroupRuleMixin(object):
         else:
             sg_rule_res[ext_local_ip.LOCAL_IP_PREFIX] = None
 
+    @staticmethod
+    @resource_extend.extends([ext_sg.SECURITYGROUPRULES])
+    def _extend_sg_rule_description(res, db_object):
+        if not hasattr(db_object, 'description'):
+            return
+        res['description'] = db_object.description
+
     def _get_security_group_rule_local_ip(self, context, rule_id):
         with db_api.CONTEXT_READER.using(context):
             try:
