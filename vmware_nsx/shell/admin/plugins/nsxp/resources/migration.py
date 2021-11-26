@@ -18,10 +18,12 @@ import sys
 import netaddr
 
 from neutron_lib.callbacks import registry
+from neutron_lib import context
 from oslo_log import log as logging
 from oslo_serialization import jsonutils
 
 from vmware_nsx.shell.admin.plugins.common import constants
+from vmware_nsx.shell.admin.plugins.common import formatters
 from vmware_nsx.shell.admin.plugins.common import utils as admin_utils
 from vmware_nsx.shell.admin.plugins.nsxp.resources import utils as p_utils
 from vmware_nsx.shell.admin.plugins.nsxv3.resources import migration
@@ -218,6 +220,158 @@ def migration_validate_external_cidrs(resource, event, trigger, **kwargs):
     sys.exit(0)
 
 
+@admin_utils.output_header
+@admin_utils.unpack_payload
+def patch_routers_without_gateway(resource, event, trigger, **kwargs):
+    state_filename = None
+    tier0_id = None
+    if kwargs.get('property'):
+        properties = admin_utils.parse_multi_keyval_opt(kwargs['property'])
+        state_filename = properties.get('state-file')
+        tier0_id = properties.get('tier0')
+
+    if not state_filename:
+        LOG.error("Must provide a filename for saving T1 GW state")
+        return
+    if not tier0_id:
+        LOG.error("Cannot execute if a Tier-0 GW uuid is not provided")
+        return
+
+    nsxpolicy = p_utils.get_connected_nsxpolicy()
+    try:
+        nsxpolicy.tier0.get(tier0_id)
+    except Exception as e:
+        LOG.error("An error occurred while retrieving Tier0 gw router %s: %s",
+                  tier0_id, e)
+        raise SystemExit(e)
+
+    ctx = context.get_admin_context()
+    fixed_routers = []
+
+    # Open state file, if exists, read data
+    try:
+        with open(state_filename) as f:
+            state_data = jsonutils.load(f)
+    except FileNotFoundError:
+        LOG.debug("State file not created yet")
+        state_data = {}
+
+    with p_utils.NsxPolicyPluginWrapper() as plugin:
+        routers = plugin.get_routers(ctx)
+        try:
+            for router in routers:
+                router_id = router['id']
+                if plugin._extract_external_gw(ctx, {'router': router}):
+                    continue
+
+                # Skip router if already fixed up
+                if router_id in state_data:
+                    LOG.info("It seems router %s has already been patched. "
+                             "Skipping it.", router_id)
+                    continue
+
+                # Fetch T1
+                t1_data = nsxpolicy.tier1.get(router_id)
+                route_adv_data = t1_data.get('route_advertisement_types', [])
+                # append state data
+                state_data[router_id] = route_adv_data
+                # Update T1: connect to T0, disable route advertisment
+                nsxpolicy.tier1.update_route_advertisement(
+                    router_id,
+                    static_routes=False,
+                    subnets=False,
+                    nat=False,
+                    lb_vip=False,
+                    lb_snat=False,
+                    ipsec_endpoints=False,
+                    tier0=tier0_id)
+                fixed_routers.append(router)
+        except Exception as e:
+            LOG.error("Failure while patching routers without "
+                      "gateway: %s", e)
+            # do not call sys.exit here
+        finally:
+            # Save state data
+            with open(state_filename, 'w') as f:
+                # Pretty print in case someone needs to insepct it
+                jsonutils.dump(state_data, f, indent=4)
+
+    LOG.info(formatters.output_formatter(
+        "Attached following routers to T0 %s" % tier0_id,
+        fixed_routers,
+        ['id', 'name', 'project_id']))
+    return fixed_routers
+
+
+@admin_utils.output_header
+@admin_utils.unpack_payload
+def restore_routers_without_gateway(resource, event, trigger, **kwargs):
+    state_filename = None
+    if kwargs.get('property'):
+        properties = admin_utils.parse_multi_keyval_opt(kwargs['property'])
+        state_filename = properties.get('state-file')
+
+    if not state_filename:
+        LOG.error("Must provide a filename for saving T1 GW state")
+        return
+
+    nsxpolicy = p_utils.get_connected_nsxpolicy()
+    ctx = context.get_admin_context()
+    restored_routers = []
+
+    # Open state file,read data
+    # Fail if file does not exist
+    try:
+        with open(state_filename) as f:
+            state_data = jsonutils.load(f)
+    except FileNotFoundError:
+        LOG.error("State file %s was not found. Aborting", state_filename)
+        sys.exit(1)
+
+    with p_utils.NsxPolicyPluginWrapper() as plugin:
+        routers = plugin.get_routers(ctx)
+        try:
+            for router in routers:
+                router_id = router['id']
+                if plugin._extract_external_gw(ctx, {'router': router}):
+                    continue
+
+                adv_info = state_data.get(router_id)
+                # Disconnect T0, set route adv from state file
+                if adv_info:
+                    nsxpolicy.tier1.update_route_advertisement(
+                        router_id,
+                        static_routes=("TIER1_STATIC_ROUTES" in adv_info),
+                        subnets=("TIER1_CONNECTED" in adv_info),
+                        nat=("TIER1_NAT" in adv_info),
+                        lb_vip=("TIER1_LB_VIP" in adv_info),
+                        lb_snat=("TIER1_LB_SNAT" in adv_info),
+                        ipsec_endpoints=("TIER1_IPSEC_LOCAL_ENDPOINT" in
+                            adv_info),
+                        tier0=None)
+                else:
+                    # Only disconnect T0
+                    LOG.info("Router advertisment info not found in state "
+                             "file for router %s", router_id)
+                    nsxpolicy.tier1.update_route_advertisement(
+                            router_id, tier0=None)
+
+                state_data.pop(router_id, None)
+                restored_routers.append(router)
+        except Exception as e:
+            LOG.error("Failure while restoring routers without "
+                      "gateway: %s", e)
+        finally:
+            with open(state_filename, 'w') as f:
+                # Pretty print in case someone needs to insepct it
+                jsonutils.dump(state_data, f, indent=4)
+        LOG.info(formatters.output_formatter(
+            "Restored following routers",
+            restored_routers,
+            ['id', 'name', 'project_id']))
+        return restored_routers
+
+
 registry.subscribe(cleanup_db_mappings,
                    constants.NSX_MIGRATE_T_P,
                    shell.Operations.CLEAN_ALL.value)
@@ -233,3 +387,11 @@ registry.subscribe(migration_tier0_redistribute,
 registry.subscribe(migration_validate_external_cidrs,
                    constants.NSX_MIGRATE_V_T,
                    shell.Operations.VALIDATE.value)
+
+registry.subscribe(patch_routers_without_gateway,
+                   constants.NSX_MIGRATE_V_T,
+                   shell.Operations.PATCH_RTR_NOGW.value)
+
+registry.subscribe(restore_routers_without_gateway,
+                   constants.NSX_MIGRATE_V_T,
+                   shell.Operations.RESTORE_RTR_NOGW.value)

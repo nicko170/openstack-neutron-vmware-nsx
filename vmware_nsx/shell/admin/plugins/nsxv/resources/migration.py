@@ -652,6 +652,29 @@ def list_ports_vif_ids(resource, event, trigger, **kwargs):
 
 @admin_utils.output_header
 @admin_utils.unpack_payload
+def get_routers_without_interfaces(resource, event, trigger, **kwargs):
+    context = n_context.get_admin_context()
+    empty_routers = []
+    with utils.NsxVPluginWrapper() as plugin:
+        routers = plugin.get_routers(context)
+        for router in routers:
+            # Routers in the metadata internal project will always have an
+            # interface, but it won't be returned by the method below, since
+            # the device_owner is network:md_interface
+            if router['project_id'] == 'metadata_internal_project':
+                LOG.debug("Skipping internal router %s", router['id'])
+                continue
+            interfaces = plugin._get_router_interfaces(router['id'])
+            if not interfaces:
+                empty_routers.append(router)
+    LOG.info(formatters.output_formatter(
+        "Routers without interfaces", empty_routers,
+        ['id', 'name', 'project_id']))
+    return empty_routers
+
+
+@admin_utils.output_header
+@admin_utils.unpack_payload
 def build_edge_mapping_file(resource, event, trigger, **kwargs):
     filename = None
     if kwargs.get('property'):
@@ -685,6 +708,10 @@ def build_edge_mapping_file(resource, event, trigger, **kwargs):
         f.close()
         LOG.info("Edge mapping data saved into %s", filename)
 
+
+registry.subscribe(get_routers_without_interfaces,
+                   constants.NSX_MIGRATE_V_T,
+                   shell.Operations.LIST_RTR_NO_IFACE.value)
 
 registry.subscribe(validate_config_for_migration,
                    constants.NSX_MIGRATE_V_T,
