@@ -183,6 +183,7 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
         self.migrate_fwaas()
         if self.octavia:
             self.migrate_octavia(source_networks)
+        self.migrate_rbac()
 
         if self.n_errors:
             LOG.error("NSX migration is Done with %s errors:", self.n_errors)
@@ -309,6 +310,40 @@ class ApiReplayClient(utils.PrepareObjectForMigration):
                 except Exception as e:
                     self.add_error("Failed to create quota %(q)s: %(e)s" %
                                    {'q': quota, 'e': e})
+        self._log_elapsed(outer_start, "Quota migration", debug=False)
+
+    def migrate_rbac(self):
+        outer_start = datetime.now()
+        source_data = self.source_neutron.list_rbac_policies()
+        source_rbac = source_data['rbac_policies']
+        for count, rbac_policy in enumerate(source_rbac, 1):
+            inner_start = datetime.now()
+            # Careful: for shared and external networks an auto generated RBAC
+            # policy might have been already added. Adding again the same rule
+            # will trigger an error
+            try:
+                new_rbac_policy = rbac_policy.copy()
+                new_rbac_policy.pop('id')
+                self.dest_neutron.create_rbac_policy(
+                    {'rbac_policy': new_rbac_policy})
+                LOG.info("Migrated RBAC policy %s for %s %s",
+                         rbac_policy['action'],
+                         rbac_policy['object_type'],
+                         rbac_policy['object_id'])
+                self._log_elapsed(
+                    inner_start,
+                    "Migrate RBAC policy %s" % rbac_policy['id'])
+            except n_exc.Conflict as e:
+                LOG.info("Skipping RBAC policy %s due to %s",
+                         rbac_policy['id'], e)
+            except Exception as e:
+                self.add_error(
+                    "Failed to migrate RBAC policy %s for %s %si: %s" % (
+                        rbac_policy['action'],
+                        rbac_policy['object_type'],
+                        rbac_policy['object_id'],
+                        e))
+
         self._log_elapsed(outer_start, "Quota migration", debug=False)
 
     def migrate_qos_rule(self, dest_policy, source_rule):
