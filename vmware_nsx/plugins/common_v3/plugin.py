@@ -1996,11 +1996,17 @@ class NsxPluginV3Base(agentschedulers_db.AZDhcpAgentSchedulerDbMixin,
                         dhcp_opts=dhcp_opts, subnet=subnet)
 
     def _cleanup_port(self, context, port_id, nsx_port_id=None):
-        # Clean up neutron port and nsx manager port if provided
+        # Clean up neutro nsx manager port if provided and then
+        # neutron port.
         # Does not handle cleanup of policy port
+        try:
+            if nsx_port_id and self.nsxlib:
+                self.nsxlib.logical_port.delete(nsx_port_id)
+        except nsx_lib_exc.ResourceNotFound:
+            LOG.info("NSX Port %s for neutron port %s was not found during "
+                     "cleanuo. Probably already deleted",
+                     port_id, nsx_port_id)
         super(NsxPluginV3Base, self).delete_port(context, port_id)
-        if nsx_port_id and self.nsxlib:
-            self.nsxlib.logical_port.delete(nsx_port_id)
 
     def _is_excluded_port(self, device_owner, port_security):
         if device_owner == l3_db.DEVICE_OWNER_ROUTER_INTF:
