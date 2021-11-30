@@ -783,7 +783,7 @@ class NSXOctaviaStatisticsCollector(object):
                     octavia_lb_ids = endpoint.get_active_loadbalancers()
                 except Exception as e:
                     LOG.error('Fetching loadbalancer list from Octavia failed '
-                              'with error %e', e)
+                              'with error %s', e)
                 if octavia_lb_ids:
                     nsx_lb_ids = [
                         lb['id'] for lb in
