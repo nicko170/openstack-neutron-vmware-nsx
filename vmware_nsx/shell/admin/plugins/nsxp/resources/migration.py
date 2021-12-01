@@ -251,7 +251,8 @@ def patch_routers_without_gateway(resource, event, trigger, **kwargs):
     # Open state file, if exists, read data
     try:
         with open(state_filename) as f:
-            state_data = jsonutils.load(f)
+            data = f.read()
+            state_data = jsonutils.loads(data)
     except FileNotFoundError:
         LOG.debug("State file not created yet")
         state_data = {}
@@ -323,7 +324,8 @@ def restore_routers_without_gateway(resource, event, trigger, **kwargs):
     # Fail if file does not exist
     try:
         with open(state_filename) as f:
-            state_data = jsonutils.load(f)
+            data = f.read()
+            state_data = jsonutils.loads(data)
     except FileNotFoundError:
         LOG.error("State file %s was not found. Aborting", state_filename)
         sys.exit(1)
