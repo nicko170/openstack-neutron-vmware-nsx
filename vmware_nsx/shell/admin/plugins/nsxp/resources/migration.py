@@ -84,16 +84,22 @@ def migration_tier0_redistribute(resource, event, trigger, **kwargs):
     properties = admin_utils.parse_multi_keyval_opt(kwargs['property'])
     action = properties.get('action')
     tier0string = properties.get('tier0s')
-    if not tier0string or not action:
+    state_filename = properties.get('state-file')
+    if not tier0string or not action or not state_filename:
         LOG.error("%s", errmsg)
         return
 
     tier0s = tier0string.split(",")
     nsxpolicy = p_utils.get_connected_nsxpolicy()
-    file_name = "tier0_redistribution_conf.json"
 
     if action.lower() == 'disable':
-        orig_conf_map = {}
+        try:
+            f = open(state_filename, "r")
+            orig_conf_map = jsonutils.loads(f.read())
+            f.close()
+        except Exception:
+            LOG.info("State file %s not found:", state_filename)
+            orig_conf_map = {}
         for tier0 in tier0s:
             # get the current config
             try:
@@ -107,48 +113,42 @@ def migration_tier0_redistribute(resource, event, trigger, **kwargs):
                          tier0)
                 continue
             fixed_conf = copy.deepcopy(orig_conf)
-            if ((not orig_conf['bgp_enabled'] and
-                 not orig_conf['ospf_enabled']) or
-                not orig_conf.get('redistribution_rules')):
+            if (not (orig_conf['bgp_enabled'] or
+                     orig_conf['ospf_enabled'] or
+                     orig_conf.get('redistribution_rules'))):
                 # Already disabled
                 LOG.info("Tier0 %s route redistribution config was not "
                          "changed because it is disabled", tier0)
                 continue
             # Check if any of the rules have tier1 flags enabled
-            found = False
             rule_num = 0
-            for rule in orig_conf['redistribution_rules']:
+            for rule in orig_conf.get('redistribution_rules', []):
                 fixed_types = []
                 for route_type in rule['route_redistribution_types']:
-                    if route_type.startswith('TIER1'):
-                        found = True
-                    else:
+                    if not route_type.startswith('TIER1'):
                         fixed_types.append(route_type)
                 fixed_conf['redistribution_rules'][rule_num][
                     'route_redistribution_types'] = fixed_types
                 rule_num = rule_num + 1
-            if not found:
-                LOG.info("Tier0 %s route redistribution config was not "
-                         "changed because there are no Tier1 types", tier0)
-                continue
             # Save the original config so it can be reverted later
             orig_conf_map[tier0] = orig_conf
+            fixed_conf['bgp_enabled'] = False
+            fixed_conf['ospf_enabled'] = False
             nsxpolicy.tier0.update_route_redistribution_config(
                 tier0, fixed_conf)
             LOG.info("Disabled Tier0 %s route redistribution config for "
                      "Tier1 routes", tier0)
-        f = open(file_name, "w")
+        f = open(state_filename, "w")
         f.write("%s" % jsonutils.dumps(orig_conf_map))
         f.close()
-
     elif action.lower() == 'restore':
         try:
-            f = open(file_name, "r")
+            f = open(state_filename, "r")
             orig_conf_map = jsonutils.loads(f.read())
             f.close()
         except Exception:
-            LOG.error("Didn't find input file %s", file_name)
-            return
+            LOG.warning("State file %s not found:", state_filename)
+            sys.exit(1)
         for tier0 in tier0s:
             if tier0 in orig_conf_map:
                 # Restore its original config:
@@ -165,6 +165,7 @@ def migration_tier0_redistribute(resource, event, trigger, **kwargs):
                          "changed", tier0)
     else:
         LOG.error("%s", errmsg)
+        sys.exit(1)
 
 
 def _cidrs_overlap(cidr0, cidr1):
