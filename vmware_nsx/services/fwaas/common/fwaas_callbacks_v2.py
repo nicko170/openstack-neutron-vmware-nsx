@@ -43,6 +43,16 @@ class DummyAgentApi(object):
 
 class NsxFwaasCallbacksV2(firewall_l3_agent_v2.L3WithFWaaS):
     """Common NSX RPC callbacks for Firewall As A Service - V2."""
+
+    # Mock implementation of the l3 agent extension interface.
+    # This is needed as the base class extends l3 agent extension
+
+    def update_network(self, context, data):
+        pass
+
+    def ha_state_change(self, context, data):
+        pass
+
     def __init__(self, with_rpc):
         # The super code needs a configuration object with the neutron host
         # and an agent_mode, which our driver doesn't use.

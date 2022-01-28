@@ -27,12 +27,12 @@ from neutron_lib import exceptions
 from neutron_lib.plugins import directory
 from neutron_lib.plugins import utils as p_utils
 
-from neutron.db import portbindings_db as pbin_db
 from neutron.plugins.ml2 import models as pbin_model
 from vmware_nsx._i18n import _
 from vmware_nsx.common import nsx_constants
 from vmware_nsx.common import utils as c_utils
 from vmware_nsx.db import nsxv_db
+from vmware_nsx.db import portbindings_db as pbin_db
 from vmware_nsx.extensions import projectpluginmap
 
 

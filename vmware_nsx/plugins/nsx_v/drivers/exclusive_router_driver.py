@@ -136,7 +136,7 @@ class RouterExclusiveDriver(router_driver.RouterBaseDriver):
             gw_info = {'network_id': external_net_id,
                        'enable_snat': router_db.enable_snat}
         self.plugin._update_router_gw_info(
-            context, router_id, gw_info, force_update=True)
+            context, router_id, gw_info, None, force_update=True)
 
     def delete_router(self, context, router_id):
         edge_id, az_name = self.plugin._get_edge_id_and_az_by_rtr_id(
@@ -179,9 +179,9 @@ class RouterExclusiveDriver(router_driver.RouterBaseDriver):
         orgaddr, orgmask, orgnexthop = (
             self.plugin._get_external_attachment_info(
                 context, router))
-
+        # We do not need to pass request_body to this function
         super(nsx_v.NsxVPluginV2, self.plugin)._update_router_gw_info(
-            context, router_id, info, router=router)
+            context, router_id, info, None, router=router)
         router = self.plugin._get_router(context, router_id)
 
         new_ext_net_id = router.gw_port_id and router.gw_port.network_id

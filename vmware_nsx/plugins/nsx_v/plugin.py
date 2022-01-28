@@ -3506,7 +3506,7 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
                                     self.metadata_proxy_handler))
             if gw_info != constants.ATTR_NOT_SPECIFIED and gw_info:
                 self._update_router_gw_info(
-                    context, lrouter['id'], gw_info)
+                    context, lrouter['id'], gw_info, None)
         except Exception:
             LOG.exception("Failed to create router %s", router)
             with excutils.save_and_reraise_exception():
@@ -3769,7 +3769,8 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
         edge_utils.update_routes(self.nsx_v, context, router_id,
                                  routes, nexthop)
 
-    def _update_current_gw_port(self, context, router_id, router, ext_ips):
+    def _update_current_gw_port(self, context, router_id, router, ext_ips,
+                                _request_body):
         """Override this function in order not to call plugins' update_port
         since the actual backend work was already done by the router driver,
         and it may cause a deadlock.
@@ -3790,7 +3791,7 @@ class NsxVPluginV2(addr_pair_db.AllowedAddressPairsMixin,
                                  'updated_port': updated_port
                              }))
 
-    def _update_router_gw_info(self, context, router_id, info,
+    def _update_router_gw_info(self, context, router_id, info, request_body,
                                is_routes_update=False,
                                force_update=False):
         with db_api.CONTEXT_WRITER.using(context):

@@ -169,8 +169,9 @@ class RouterDistributedDriver(router_driver.RouterBaseDriver):
         # verify the edge was deployed before calling super code.
         tlr_edge_id = self._get_edge_id_or_raise(context, router_id)
 
+        # Pass None request body to function
         super(nsx_v.NsxVPluginV2, self.plugin)._update_router_gw_info(
-            context, router_id, info, router=router)
+            context, router_id, info, None, router=router)
         router = self.plugin._get_router(context, router_id)
 
         new_ext_net_id = router.gw_port_id and router.gw_port.network_id

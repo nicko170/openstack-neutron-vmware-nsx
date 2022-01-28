@@ -2759,7 +2759,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
             method()
 
     def _update_router_gw_info(self, context, router_id, info,
-                               called_from=None):
+                               request_body, called_from=None):
         # Get the original data of the router GW
         router = self._get_router(context, router_id)
         orig_info = self._get_router_gw_info(context, router_id)
@@ -2779,8 +2779,9 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                 [sub['network_id'] for sub in router_subnets])
 
         # First update the neutron DB
+        # We do not need to pass a request body
         super(NsxPolicyPlugin, self)._update_router_gw_info(
-            context, router_id, info, router=router)
+            context, router_id, info, None, router=router)
         router = self._get_router(context, router_id)
 
         # Get the new tier0 of the updated router (or None if GW was removed)
@@ -2868,7 +2869,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
                     LOG.error("Rolling back router %s GW info update because "
                               "of NSX failure %s", router_id, e)
                     super(NsxPolicyPlugin, self)._update_router_gw_info(
-                        context, router_id, orig_info, router=router)
+                        context, router_id, orig_info, None, router)
 
     def _update_router_advertisement_rules(self, router_id, subnets,
                                            advertise_ipv6):
@@ -2934,7 +2935,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         if gw_info and gw_info != const.ATTR_NOT_SPECIFIED:
             try:
                 self._update_router_gw_info(context, router['id'], gw_info,
-                                            called_from="create")
+                                            None, called_from="create")
             except (db_exc.DBError, nsx_lib_exc.NsxLibException):
                 with excutils.save_and_reraise_exception():
                     LOG.error("Failed to set gateway info for router "
@@ -2953,7 +2954,7 @@ class NsxPolicyPlugin(nsx_plugin_common.NsxPluginV3Base):
         if gw_info:
             try:
                 self._update_router_gw_info(context, router_id, {},
-                                            called_from="delete")
+                                            None, called_from="delete")
             except nsx_lib_exc.NsxLibException as e:
                 LOG.error("Failed to remove router %s gw info before "
                           "deletion, but going on with the deletion anyway: "

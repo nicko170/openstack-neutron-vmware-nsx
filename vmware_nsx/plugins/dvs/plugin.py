@@ -43,7 +43,6 @@ from neutron.db import external_net_db
 from neutron.db import l3_db
 from neutron.db.models import securitygroup as securitygroup_model
 from neutron.db import models_v2
-from neutron.db import portbindings_db
 from neutron.db import portsecurity_db
 from neutron.db import securitygroups_db
 from neutron.db import vlantransparent_db as vlan_ext_db
@@ -59,6 +58,7 @@ from vmware_nsx.common import nsx_constants
 from vmware_nsx.common import utils as c_utils
 from vmware_nsx.db import db as nsx_db
 from vmware_nsx.db import nsxv_db
+from vmware_nsx.db import portbindings_db
 from vmware_nsx.dhcp_meta import modes as dhcpmeta_modes
 from vmware_nsx.dvs import dvs
 from vmware_nsx.dvs import dvs_utils

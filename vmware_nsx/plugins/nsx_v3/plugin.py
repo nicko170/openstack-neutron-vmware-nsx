@@ -2007,7 +2007,7 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         LOG.info("Deleted service router for %s (NSX logical router %s)",
                  router_id, nsx_router_id)
 
-    def _update_router_gw_info(self, context, router_id, info):
+    def _update_router_gw_info(self, context, router_id, info, _request_body):
         router = self._get_router(context, router_id)
         org_tier0_uuid = self._get_tier0_uuid_by_router(context, router)
         org_enable_snat = router.enable_snat
@@ -2028,8 +2028,9 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
         # TODO(berlin): For nonat use case, we actually don't need a gw port
         # which consumes one external ip. But after looking at the DB logic
         # and we need to make a big change so don't touch it at present.
+        # NOTE: We do not need to pass request_body to the function below
         super(NsxV3Plugin, self)._update_router_gw_info(
-            context, router_id, info, router=router)
+            context, router_id, info, None, router=router)
         router = self._get_router(context, router_id)
 
         new_tier0_uuid = self._get_tier0_uuid_by_router(context, router)
@@ -2184,7 +2185,8 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
 
         if gw_info and gw_info != const.ATTR_NOT_SPECIFIED:
             try:
-                self._update_router_gw_info(context, router['id'], gw_info)
+                self._update_router_gw_info(context, router['id'],
+                                            gw_info, None)
             except (db_exc.DBError, nsx_lib_exc.ManagerError):
                 with excutils.save_and_reraise_exception():
                     LOG.error("Failed to set gateway info for router "
@@ -2203,7 +2205,7 @@ class NsxV3Plugin(nsx_plugin_common.NsxPluginV3Base,
                                                   interface=None)
         gw_info = self._get_router_gw_info(context, router_id)
         if gw_info:
-            self._update_router_gw_info(context, router_id, {})
+            self._update_router_gw_info(context, router_id, {}, None)
         nsx_router_id = nsx_db.get_nsx_router_id(context.session,
                                                  router_id)
         super(NsxV3Plugin, self).delete_router(context, router_id)

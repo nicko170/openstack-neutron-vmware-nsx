@@ -84,7 +84,8 @@ class RouterSharedDriver(router_driver.RouterBaseDriver):
                 context, router_id, router)
 
         if gw_info != constants.ATTR_NOT_SPECIFIED:
-            self.plugin._update_router_gw_info(context, router_id, gw_info)
+            self.plugin._update_router_gw_info(context, router_id,
+                                               gw_info, None)
         if 'admin_state_up' in r:
             # If router was deployed on a different edge then
             # admin-state-up is already updated on the new edge.
@@ -700,8 +701,9 @@ class RouterSharedDriver(router_driver.RouterBaseDriver):
         router = self.plugin._get_router(context, router_id)
         edge_id = edge_utils.get_router_edge_id(context, router_id)
         if not edge_id:
+            # Pass a None request_body since we do not need it
             super(nsx_v.NsxVPluginV2, self.plugin)._update_router_gw_info(
-                context, router_id, info, router=router)
+                context, router_id, info, None, router=router)
         # UPDATE gw info only if the router has been attached to an edge
         else:
             is_migrated = False
@@ -714,7 +716,7 @@ class RouterSharedDriver(router_driver.RouterBaseDriver):
                 self.plugin._get_external_attachment_info(
                     context, router))
             super(nsx_v.NsxVPluginV2, self.plugin)._update_router_gw_info(
-                context, router_id, info, router=router)
+                context, router_id, info, None, router=router)
             router = self.plugin._get_router(context, router_id)
             new_ext_net_id = (router.gw_port_id and
                               router.gw_port.network_id)

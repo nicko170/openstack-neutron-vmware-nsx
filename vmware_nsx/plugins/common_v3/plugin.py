@@ -39,7 +39,6 @@ from neutron.db import l3_db
 from neutron.db import l3_gwmode_db
 from neutron.db.models import securitygroup as securitygroup_model
 from neutron.db import models_v2
-from neutron.db import portbindings_db
 from neutron.db import portsecurity_db
 from neutron.db.quota import driver_nolock  # noqa
 from neutron.db import securitygroups_db
@@ -83,6 +82,7 @@ from vmware_nsx.db import extended_security_group as extended_sec
 from vmware_nsx.db import extended_security_group_rule as extend_sg_rule
 from vmware_nsx.db import maclearning as mac_db
 from vmware_nsx.db import nsx_portbindings_db as pbin_db
+from vmware_nsx.db import portbindings_db
 from vmware_nsx.extensions import advancedserviceproviders as as_providers
 from vmware_nsx.extensions import maclearning as mac_ext
 from vmware_nsx.extensions import providersecuritygroup as provider_sg

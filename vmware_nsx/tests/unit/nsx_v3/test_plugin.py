@@ -995,6 +995,9 @@ class TestSubnetsV2(common_v3.NsxV3TestSubnets, NsxV3PluginTestCaseMixin):
     def test_create_subnet_ipv6_slaac_with_db_reference_error(self):
         self.skipTest('No DHCP v6 Support yet')
 
+    def test_update_subnet_the_same_gw_as_in_use_by_router_ipv6(self):
+        self.skipTest('No SLAAC/DHCPv6 Support yet')
+
 
 class TestPortsV2(common_v3.NsxV3SubnetMixin,
                   common_v3.NsxV3TestPorts, NsxV3PluginTestCaseMixin,
